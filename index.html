@@ -1,0 +1,257 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Astro Bank Pay — demo</title>
+<style>
+:root{
+  --green:#00C853;
+  --neon:#00FF55;
+  --bg:#0A0A0A;
+  --white:#ffffff;
+}
+html,body{
+  height:100%;
+  margin:0;
+  font-family:Inter,Segoe UI,Roboto,Arial,sans-serif;
+  background:var(--bg);
+  color:var(--white);
+}
+.center{display:flex;align-items:center;justify-content:center;height:100%;}
+.card{
+  width:360px;max-width:94%;
+  background:linear-gradient(180deg,#070707,#0f0f0f);
+  border-radius:16px;
+  padding:28px;
+  box-shadow:0 8px 30px rgba(0,0,0,.6);
+  text-align:center;
+}
+.brand{font-weight:700;font-size:34px;color:var(--neon);letter-spacing:2px;margin-bottom:6px;}
+.brand-sub{font-size:14px;color:#cfcfcf;margin-bottom:18px;}
+.btn{
+  display:inline-block;
+  background:var(--neon);
+  color:#07110b;
+  font-weight:700;
+  padding:12px 20px;
+  border-radius:12px;
+  cursor:pointer;
+  border:none;
+  font-size:16px;
+  margin-top:12px;
+  transition:.25s;
+}
+.btn:active{transform:scale(.96);}
+input[type="number"]{
+  width:100%;
+  padding:8px;
+  border-radius:10px;
+  border:none;
+  font-size:16px;
+  margin-top:8px;
+}
+.overlay,.modal{
+  position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
+  z-index:100;opacity:0;pointer-events:none;transition:opacity .25s;
+}
+.overlay.show,.modal.show{opacity:1;pointer-events:auto;}
+.panel,.modal-card{
+  width:320px;
+  background:linear-gradient(180deg,#050505,#0b0b0b);
+  border-radius:14px;
+  padding:24px;
+  text-align:center;
+  color:var(--neon);
+  box-shadow:0 20px 40px rgba(0,0,0,.6);
+}
+.modal-card{
+  background:linear-gradient(180deg,#fff,#f8f8f8);
+  color:#06120a;
+}
+.amount{font-size:48px;font-weight:800;margin:6px 0;color:var(--neon);}
+.pay-options{display:flex;gap:10px;justify-content:center;margin-top:12px;}
+.pay-option{
+  padding:10px 12px;border-radius:10px;
+  background:#0d0d0d;cursor:pointer;
+  border:1px solid rgba(255,255,255,.08);
+  display:flex;flex-direction:column;align-items:center;
+  transition:.2s;
+}
+.pay-option:hover{background:#161616;}
+.pay-icon{font-size:20px;display:block;text-align:center;}
+.dog-avatar{
+  width:64px;height:64px;border-radius:12px;
+  background:#0b0b0b;color:#fff;
+  display:inline-flex;align-items:center;justify-content:center;
+  font-weight:800;margin-right:10px;
+  box-shadow:0 6px 18px rgba(0,0,0,.25);
+  font-size:32px;
+}
+.success-text{font-size:22px;font-weight:700;margin-top:12px;}
+.paid-amount{font-size:18px;color:#046a2f;margin-top:8px;font-weight:700;}
+.success-badge{
+  width:96px;height:96px;border-radius:64px;
+  margin:0 auto 12px;display:flex;align-items:center;justify-content:center;
+  background:linear-gradient(180deg,var(--green),#00e06b);
+  box-shadow:0 12px 30px rgba(0,200,83,.14);
+  animation:pop .4s cubic-bezier(.2,.9,.2,1);
+}
+@keyframes pop {
+  0%{transform:scale(.6);opacity:0}
+  60%{transform:scale(1.08);opacity:1}
+  100%{transform:scale(1)}
+}
+.flash-success{
+  position:fixed;inset:0;
+  background:radial-gradient(circle,rgba(0,255,100,0.3),transparent 70%);
+  z-index:200;
+  animation:flash .7s ease-out forwards;
+}
+@keyframes flash{
+  0%{opacity:0}
+  30%{opacity:1}
+  100%{opacity:0}
+}
+</style>
+</head>
+<body>
+<div class="center">
+  <div class="card">
+    <div class="brand">АСТРО БАНК</div>
+    <div class="brand-sub">Плати как хочешь</div>
+    <div style="margin-top:0;color:#cfcfcf">Введите сумму или сгенерируйте:</div>
+    <input type="number" id="manualAmount" placeholder="Введите сумму ₽" min="1">
+    <button id="startBtn" class="btn">Сгенерировать сумму</button>
+    <div style="margin-top:10px">
+      <button id="demoSmall" class="btn" style="background:#333;color:var(--neon);margin-right:8px">Демо 10–50 ₽</button>
+      <button id="demoBig" class="btn" style="background:#111;color:var(--neon)">Демо 500–1000 ₽</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="overlay">
+  <div class="panel">
+    <div>Сумма для оплаты:</div>
+    <div class="amount" id="amountText">— ₽</div>
+    <div style="margin-top:14px">
+      <button id="readyBtn" class="btn">Готово</button>
+      <button id="cancelBtn" class="btn" style="background:#222;color:var(--neon);margin-left:8px">Отмена</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="choosePayModal">
+  <div class="modal-card">
+    <div class="success-text" style="margin-bottom:16px">Выберите способ оплаты</div>
+    <div class="pay-options">
+      <div class="pay-option" id="paySmile">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
+          <circle cx="12" cy="12" r="10" stroke="#00C853" stroke-width="2"/>
+          <path d="M8 14C9.33333 15.3333 10.6667 15.3333 12 15.3333C13.3333 15.3333 14.6667 15.3333 16 14" stroke="#00C853" stroke-width="2" stroke-linecap="round"/>
+          <circle cx="9" cy="10" r="1.3" fill="#00C853"/>
+          <circle cx="15" cy="10" r="1.3" fill="#00C853"/>
+        </svg>
+        <div style="font-size:12px;margin-top:4px">Улыбка</div>
+      </div>
+      <div class="pay-option" id="payCard">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
+          <rect x="2" y="6" width="20" height="12" rx="2" stroke="#00C853" stroke-width="2"/>
+          <line x1="2" y1="10" x2="22" y2="10" stroke="#00C853" stroke-width="2"/>
+        </svg>
+        <div style="font-size:12px;margin-top:4px">Карта</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="modal">
+  <div class="modal-card">
+    <div class="success-badge">
+      <svg class="check" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+        <path d="M18 34 L28 44 L46 22" stroke="#fff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+      </svg>
+    </div>
+    <div style="display:flex;align-items:center;justify-content:center;margin-top:12px">
+      <div class="dog-avatar">🐶</div>
+      <div style="text-align:left">
+        <div class="success-text" id="successTitle">Оплата</div>
+        <div class="paid-amount" id="paidAmount">— ₽</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const startBtn=document.getElementById('startBtn');
+const overlay=document.getElementById('overlay');
+const amountText=document.getElementById('amountText');
+const readyBtn=document.getElementById('readyBtn');
+const cancelBtn=document.getElementById('cancelBtn');
+const modal=document.getElementById('modal');
+const paidAmount=document.getElementById('paidAmount');
+const successTitle=document.getElementById('successTitle');
+const demoSmall=document.getElementById('demoSmall');
+const demoBig=document.getElementById('demoBig');
+const manualAmount=document.getElementById('manualAmount');
+const choosePayModal=document.getElementById('choosePayModal');
+const paySmile=document.getElementById('paySmile');
+const payCard=document.getElementById('payCard');
+
+function formatRub(v){return v.toString().replace(/\B(?=(\d{3})+(?!\d))/g,"\u202F")+" ₽";}
+function randomAmountInRange(min,max){return Math.floor(Math.random()*(max-min+1))+min;}
+function showOverlay(amount){amountText.textContent=formatRub(amount);overlay.classList.add('show');}
+function hideOverlay(){overlay.classList.remove('show');}
+
+function playSound(){
+  const s=new Audio("assets/success.mp3");
+  s.volume=0.5;
+  s.play().catch(()=>{});
+}
+
+function flashSuccess(){
+  const f=document.createElement('div');
+  f.className='flash-success';
+  document.body.appendChild(f);
+  setTimeout(()=>f.remove(),700);
+  if(navigator.vibrate) navigator.vibrate(120);
+}
+
+startBtn.onclick=()=>{
+  let val=parseInt(manualAmount.value);
+  if(!val||val<=0) val=randomAmountInRange(100,800);
+  showOverlay(val);
+};
+demoSmall.onclick=()=>showOverlay(randomAmountInRange(10,50));
+demoBig.onclick=()=>showOverlay(randomAmountInRange(500,1000));
+cancelBtn.onclick=()=>hideOverlay();
+readyBtn.onclick=()=>{hideOverlay();choosePayModal.classList.add('show');};
+
+function confirmPayment(method){
+  choosePayModal.classList.remove('show');
+  const raw=amountText.textContent.replace(/\s/g,'').replace('₽','');
+  const amount=parseInt(raw)||0;
+  paidAmount.textContent=formatRub(amount);
+  successTitle.textContent=method==='smile'?"Оплата улыбкой":"Оплата картой";
+  modal.classList.add('show');
+  playSound();
+  flashSuccess();
+  setTimeout(()=>{
+    successTitle.textContent="Успешно";
+    setTimeout(()=>modal.classList.remove('show'),2000);
+  },400);
+}
+
+paySmile.onclick=()=>confirmPayment('smile');
+payCard.onclick=()=>confirmPayment('card');
+
+document.onkeydown=e=>{
+  if(e.key==='Escape'){
+    hideOverlay();
+    modal.classList.remove('show');
+    choosePayModal.classList.remove('show');
+  }
+};
+</script>
+</body>
+</html>
